@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JTR Frotas ERP</title>
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Chart.js para dashboards -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar / Menu Lateral -->
+        <aside class="sidebar">
+            <div class="brand">
+                <h2>JTR Frotas <span>v2.0</span></h2>
+            </div>
+            <nav class="menu">
+                <a href="#/dashboard" class="menu-item active"><i data-lucide="layout-dashboard"></i> Dashboard</a>
+                <a href="#/motoristas" class="menu-item"><i data-lucide="users"></i> Motoristas</a>
+                <a href="#/caminhoes" class="menu-item"><i data-lucide="truck"></i> Caminhões</a>
+                <a href="#/clientes" class="menu-item"><i data-lucide="briefcase"></i> Clientes</a>
+                <a href="#/viagens" class="menu-item"><i data-lucide="map-pin"></i> Viagens</a>
+                <a href="#/financeiro" class="menu-item"><i data-lucide="dollar-sign"></i> Financeiro</a>
+                <a href="#/manutencoes" class="menu-item"><i data-lucide="wrench"></i> Manutenções</a>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="topbar">
+                <h1 id="page-title">Dashboard</h1>
+                <div class="user-profile">
+                    <span>Usuário: <strong>Administrador</strong></span>
+                </div>
+            </header>
+
+            <!-- Dynamic View Routing -->
+            <div id="view-container" class="content-body">
+                <!-- As telas serão carregadas aqui dinamicamente -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Script Principal como ES Module -->
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
