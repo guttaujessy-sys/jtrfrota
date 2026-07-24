@@ -1,0 +1,1836 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FleetAnalytics PRO - Gestão Financeira de Frota</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        },
+                        darkbg: '#0f172a',
+                        darkcard: '#1e293b',
+                        darkborder: '#334155'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- html2pdf CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(0.7);
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-darkbg text-slate-800 dark:text-slate-100 font-sans min-h-screen flex flex-col transition-colors duration-200">
+
+    <!-- Header Navigation -->
+    <header class="bg-white dark:bg-darkcard border-b border-slate-200 dark:border-darkborder sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-brand-600 text-white rounded-xl shadow-lg shadow-brand-500/30">
+                    <i class="fa-solid fa-truck-fast text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight tracking-tight">FleetAnalytics <span class="text-brand-500 text-xs px-2 py-0.5 rounded-full bg-brand-50 dark:bg-brand-900/40 border border-brand-200 dark:border-brand-700">P&L EXECUTIVO</span></h1>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Faturamento, Pedágios, Combustível, Despesas & Contas a Receber</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 sm:gap-3">
+                <div class="flex items-center gap-1.5">
+                    <button onclick="openNewEntryModal('viagem')" class="flex items-center gap-1.5 px-3 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg shadow transition">
+                        <i class="fa-solid fa-plus"></i> <span class="hidden sm:inline">Viagem</span>
+                    </button>
+                    <button onclick="openNewEntryModal('combustivel')" class="flex items-center gap-1.5 px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg shadow transition">
+                        <i class="fa-solid fa-gas-pump"></i> <span class="hidden sm:inline">Combustível</span>
+                    </button>
+                    <button onclick="openNewEntryModal('despesa')" class="flex items-center gap-1.5 px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg shadow transition">
+                        <i class="fa-solid fa-file-invoice-dollar"></i> <span class="hidden sm:inline">Despesa</span>
+                    </button>
+                </div>
+
+                <button id="themeToggle" class="p-2.5 rounded-lg border border-slate-200 dark:border-darkborder hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition">
+                    <i class="fa-solid fa-moon dark:hidden"></i>
+                    <i class="fa-solid fa-sun hidden dark:inline text-amber-400"></i>
+                </button>
+
+                <button onclick="exportToExcel()" class="hidden sm:flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow transition">
+                    <i class="fa-solid fa-file-excel"></i> Excel
+                </button>
+                <button onclick="exportToPDF()" class="hidden sm:flex items-center gap-2 px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg shadow transition">
+                    <i class="fa-solid fa-file-pdf"></i> PDF
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main id="dashboardContent" class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- File Upload & Multi-Filter Control Panel -->
+        <section class="bg-white dark:bg-darkcard rounded-2xl border border-slate-200 dark:border-darkborder p-6 shadow-sm space-y-4">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div id="dropZone" class="flex-1 w-full border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-brand-500 dark:hover:border-brand-500 rounded-xl p-4 text-center transition cursor-pointer bg-slate-50/50 dark:bg-slate-800/30">
+                    <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="hidden">
+                    <div class="flex items-center justify-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-brand-50 dark:bg-brand-900/30 text-brand-600 flex items-center justify-center text-base">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                        </div>
+                        <div class="text-left">
+                            <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">Carregar Planilha Externa (.xlsx, .csv)</p>
+                            <p class="text-[11px] text-slate-400">Os dados salvos localmente continuam ativos e salvos no navegador</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="clearLocalData()" class="px-3 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-rose-600 hover:text-white text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition flex items-center gap-1.5" title="Limpar dados salvos no navegador">
+                        <i class="fa-solid fa-trash-can"></i> Limpar Dados Salvos
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filter Controls -->
+            <div id="filterBar" class="space-y-3 pt-4 border-t border-slate-100 dark:border-darkborder">
+                <div class="flex items-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400 uppercase tracking-wider">
+                    <i class="fa-solid fa-filter"></i> Filtros Multidimensionais & Período
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-8 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                            <i class="fa-solid fa-user-gear text-brand-500"></i> Motorista:
+                        </label>
+                        <select id="motoristaFilter" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-2.5 py-2 font-semibold focus:ring-2 focus:ring-brand-500 truncate">
+                            <option value="ALL">Todos os Motoristas</option>
+                            <option value="Gabriel Fernandes Siqueira">Gabriel Fernandes Siqueira</option>
+                            <option value="Luis Fernando Lande">Luis Fernando Lande</option>
+                            <option value="Marcos Antonio da Silva Dadona">Marcos Antonio da Silva Dadona</option>
+                            <option value="Edson Leandro da Silva">Edson Leandro da Silva</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                            <i class="fa-solid fa-building text-brand-500"></i> Cliente:
+                        </label>
+                        <select id="clienteFilter" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-2.5 py-2 font-semibold focus:ring-2 focus:ring-brand-500 truncate">
+                            <option value="ALL">Todos os Clientes</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                            <i class="fa-solid fa-truck-front text-brand-500"></i> Placas:
+                        </label>
+                        <select id="placaFilter" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-2.5 py-2 font-semibold focus:ring-2 focus:ring-brand-500 truncate">
+                            <option value="ALL">Todas as Placas</option>
+                            <option value="PROPRIOS">Próprios (BDE-4B86 e SUC-9A81)</option>
+                            <option value="SOCIEDADE">Sociedade (FYH-8F72 e SWM-1H69)</option>
+                            <option value="BDE-4B86">Caminhão BDE-4B86</option>
+                            <option value="SUC-9A81">Caminhão SUC-9A81</option>
+                            <option value="FYH-8F72">Caminhão FYH-8F72</option>
+                            <option value="SWM-1H69">Caminhão SWM-1H69</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                            <i class="fa-solid fa-calendar-days text-brand-500"></i> Mês:
+                        </label>
+                        <select id="mesFilter" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-2.5 py-2 font-semibold focus:ring-2 focus:ring-brand-500">
+                            <option value="ALL">Todos os Meses</option>
+                            <option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option>
+                            <option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option>
+                            <option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option>
+                            <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                            <i class="fa-solid fa-calendar text-brand-500"></i> Ano:
+                        </label>
+                        <select id="anoFilter" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-2.5 py-2 font-semibold focus:ring-2 focus:ring-brand-500">
+                            <option value="ALL">Todos os Anos</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                            <i class="fa-solid fa-calendar-day text-brand-500"></i> Data Inicial:
+                        </label>
+                        <input type="date" id="dataInicioFilter" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-2.5 py-2 font-semibold focus:ring-2 focus:ring-brand-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                            <i class="fa-solid fa-calendar-day text-brand-500"></i> Data Final:
+                        </label>
+                        <input type="date" id="dataFimFilter" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-2.5 py-2 font-semibold focus:ring-2 focus:ring-brand-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                            <i class="fa-solid fa-table text-brand-500"></i> Aba na Tabela:
+                        </label>
+                        <select id="sheetSelect" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-2.5 py-2 font-semibold focus:ring-2 focus:ring-brand-500 truncate">
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Executive Cards Grid (7 Cards) -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
+            
+            <div onclick="openDrillDownModal('viagens_destino')" class="bg-darkcard rounded-xl border border-darkborder p-4 shadow-xl relative overflow-hidden cursor-pointer hover:border-amber-500 transition group flex flex-col justify-between">
+                <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-amber-500 rounded-l"></div>
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[10px] font-black tracking-wider text-slate-400 uppercase">Total de Viagens</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold rounded">
+                            <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i> Detalhes
+                        </span>
+                    </div>
+                    <div id="kpiTotalViagens" class="text-2xl font-black text-amber-400 tracking-tight mt-1">0</div>
+                </div>
+                <div class="mt-3 pt-2 border-t border-slate-800 flex items-center gap-1.5 text-amber-400/90 text-[11px] font-semibold">
+                    <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+                    <span>Clique p/ ver por destino</span>
+                </div>
+            </div>
+
+            <!-- 1. Faturamento Bruto -->
+            <div onclick="openDrillDownModal('frete_bruto')" class="bg-white dark:bg-darkcard rounded-2xl border border-emerald-300 dark:border-emerald-800/60 p-3.5 shadow-sm hover:border-emerald-500 cursor-pointer transition flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Faturamento</p>
+                        <h3 id="kpiFreteBruto" class="text-base font-extrabold mt-1 text-emerald-600 dark:text-emerald-400">R$ 0,00</h3>
+                    </div>
+                    <div class="p-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 rounded-lg">
+                        <i class="fa-solid fa-sack-dollar text-xs"></i>
+                    </div>
+                </div>
+                <p class="text-[9px] text-slate-400 mt-2 flex items-center justify-between">
+                    <span>Aba Viagens</span> <i class="fa-solid fa-magnifying-glass-plus"></i>
+                </p>
+            </div>
+
+            <!-- 2. A Receber por CIOT -->
+            <div onclick="openDrillDownModal('a_receber')" class="bg-white dark:bg-darkcard rounded-2xl border border-amber-300 dark:border-amber-800/60 p-3.5 shadow-sm hover:border-amber-500 cursor-pointer transition flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">A Receber (CIOT)</p>
+                        <h3 id="kpiAReceber" class="text-base font-extrabold mt-1 text-amber-600 dark:text-amber-400">R$ 0,00</h3>
+                    </div>
+                    <div class="p-1.5 bg-amber-50 dark:bg-amber-950/40 text-amber-600 rounded-lg">
+                        <i class="fa-solid fa-hand-holding-dollar text-xs"></i>
+                    </div>
+                </div>
+                <p class="text-[9px] text-slate-400 mt-2 flex items-center justify-between">
+                    <span>Líquido - Rec. - Desp.</span> <i class="fa-solid fa-magnifying-glass-plus"></i>
+                </p>
+            </div>
+
+            <!-- 3. Total Pedágios -->
+            <div onclick="openDrillDownModal('pedagio')" class="bg-white dark:bg-darkcard rounded-2xl border border-indigo-300 dark:border-indigo-800/60 p-3.5 shadow-sm hover:border-indigo-500 cursor-pointer transition flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">(-) Pedágios</p>
+                        <h3 id="kpiPedagio" class="text-base font-extrabold mt-1 text-indigo-600 dark:text-indigo-400">R$ 0,00</h3>
+                    </div>
+                    <div class="p-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 rounded-lg">
+                        <i class="fa-solid fa-road text-xs"></i>
+                    </div>
+                </div>
+                <p class="text-[9px] text-slate-400 mt-2 flex items-center justify-between">
+                    <span>Tarifas Viagem</span> <i class="fa-solid fa-magnifying-glass-plus"></i>
+                </p>
+            </div>
+
+            <!-- 4. Combustível Total -->
+            <div onclick="openDrillDownModal('combustivel')" class="bg-white dark:bg-darkcard rounded-2xl border border-slate-200 dark:border-darkborder p-3.5 shadow-sm hover:border-rose-500 cursor-pointer transition flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-[10px] font-medium text-slate-500 dark:text-slate-400">(-) Combustível</p>
+                        <h3 id="kpiCombustivel" class="text-base font-extrabold mt-1 text-rose-600 dark:text-rose-400">R$ 0,00</h3>
+                    </div>
+                    <div class="p-1.5 bg-rose-50 dark:bg-rose-950/40 text-rose-600 rounded-lg">
+                        <i class="fa-solid fa-gas-pump text-xs"></i>
+                    </div>
+                </div>
+                <p class="text-[9px] text-slate-400 mt-2 flex items-center justify-between">
+                    <span>Diesel / Arla (Todos)</span> <i class="fa-solid fa-magnifying-glass-plus"></i>
+                </p>
+            </div>
+
+            <!-- 5. Outras Despesas -->
+            <div onclick="openDrillDownModal('despesas')" class="bg-white dark:bg-darkcard rounded-2xl border border-slate-200 dark:border-darkborder p-3.5 shadow-sm hover:border-amber-500 cursor-pointer transition flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-[10px] font-medium text-slate-500 dark:text-slate-400">(-) Outras Desp.</p>
+                        <h3 id="kpiDespesas" class="text-base font-extrabold mt-1 text-amber-600 dark:text-amber-400">R$ 0,00</h3>
+                    </div>
+                    <div class="p-1.5 bg-amber-50 dark:bg-amber-950/40 text-amber-600 rounded-lg">
+                        <i class="fa-solid fa-wrench text-xs"></i>
+                    </div>
+                </div>
+                <p class="text-[9px] text-slate-400 mt-2 flex items-center justify-between">
+                    <span>Categorias</span> <i class="fa-solid fa-magnifying-glass-plus"></i>
+                </p>
+            </div>
+
+            <!-- 6. Resultado Líquido -->
+            <div onclick="openDrillDownModal('resultado')" class="bg-white dark:bg-darkcard rounded-2xl border border-slate-200 dark:border-darkborder p-3.5 shadow-sm hover:border-blue-500 cursor-pointer transition flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-[10px] font-medium text-slate-500 dark:text-slate-400">Lucro Líquido</p>
+                        <h3 id="kpiResultado" class="text-base font-extrabold mt-1 text-blue-600 dark:text-blue-400">R$ 0,00</h3>
+                    </div>
+                    <div class="p-1.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 rounded-lg">
+                        <i class="fa-solid fa-scale-balanced text-xs"></i>
+                    </div>
+                </div>
+                <p class="text-[9px] text-slate-400 mt-2 flex items-center justify-between">
+                    <span>Margem: <b id="kpiMargem">0%</b></span> <i class="fa-solid fa-magnifying-glass-plus"></i>
+                </p>
+            </div>
+        </section>
+
+        <!-- Charts Section -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white dark:bg-darkcard rounded-2xl border border-slate-200 dark:border-darkborder p-5 shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-column text-brand-500"></i> Composição Financeira (Faturamento vs Despesas)
+                    </h3>
+                </div>
+                <div class="relative h-64 w-full">
+                    <canvas id="chartPnL"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-darkcard rounded-2xl border border-slate-200 dark:border-darkborder p-5 shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-truck-monster text-brand-500"></i> Faturamento Bruto por Caminhão
+                    </h3>
+                </div>
+                <div class="relative h-64 w-full">
+                    <canvas id="chartPlacas"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Operational & Fleet Efficiency Section -->
+        <section class="bg-white dark:bg-darkcard rounded-2xl border border-slate-200 dark:border-darkborder p-6 shadow-sm space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-gauge-high text-brand-500"></i> Eficiência Operacional & Giro de Viagem (Fechamento no San Remo)
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Quilometragem percorrida e média de consumo de diesel calculada considerando todos os postos de abastecimento, com fechamento de giro no Posto San Remo</p>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-darkborder flex items-center gap-4">
+                    <div class="p-3 bg-brand-50 dark:bg-brand-950/40 text-brand-600 rounded-xl text-lg">
+                        <i class="fa-solid fa-road"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">Total KM Rodado</p>
+                        <h4 id="kpiTotalKm" class="text-lg font-bold text-slate-800 dark:text-white mt-0.5">0 km</h4>
+                    </div>
+                </div>
+
+                <div class="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-darkborder flex items-center gap-4">
+                    <div class="p-3 bg-rose-50 dark:bg-rose-950/40 text-rose-600 rounded-xl text-lg">
+                        <i class="fa-solid fa-droplet"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">Total Diesel Abastecido (Giro San Remo)</p>
+                        <h4 id="kpiTotalLitros" class="text-lg font-bold text-slate-800 dark:text-white mt-0.5">0 L</h4>
+                    </div>
+                </div>
+
+                <div class="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-darkborder flex items-center gap-4">
+                    <div class="p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 rounded-xl text-lg">
+                        <i class="fa-solid fa-chart-line"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">Média de Consumo (km/L)</p>
+                        <h4 id="kpiMediaKmLitro" class="text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">0,00 km/L</h4>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dynamic Data Table Section -->
+        <section class="bg-white dark:bg-darkcard rounded-2xl border border-slate-200 dark:border-darkborder p-6 shadow-sm space-y-4">
+            
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="relative w-full sm:w-80">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="text" id="searchInput" placeholder="Buscar em qualquer campo..." 
+                        class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-darkborder rounded-xl pl-9 pr-4 py-2 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                </div>
+
+                <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <span class="text-xs text-slate-500 dark:text-slate-400">Exibir:</span>
+                    <select id="pageSizeSelect" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-1.5">
+                        <option value="10">10 linhas</option>
+                        <option value="25">25 linhas</option>
+                        <option value="50">50 linhas</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="overflow-x-auto custom-scrollbar rounded-xl border border-slate-200 dark:border-darkborder">
+                <table id="dataTable" class="w-full text-left border-collapse text-xs">
+                    <thead class="bg-slate-100/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 uppercase tracking-wider font-semibold border-b border-slate-200 dark:border-darkborder">
+                        <tr id="tableHeader">
+                            <th class="p-3">Nenhum dado carregado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                        <tr>
+                            <td class="p-6 text-center text-slate-400">Carregue uma planilha ou faça novos lançamentos para ver os registros.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+                <span id="paginationInfo" class="text-xs text-slate-500 dark:text-slate-400">Exibindo 0 registros</span>
+                <div class="flex items-center gap-1">
+                    <button id="btnPrev" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 text-xs hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50">Anterior</button>
+                    <span id="pageNumber" class="text-xs px-3 font-semibold text-brand-600 dark:text-brand-400">Página 1</span>
+                    <button id="btnNext" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-slate-800 text-xs hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50">Próxima</button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal Detalhes -->
+    <div id="drillModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-darkcard rounded-2xl border border-slate-200 dark:border-darkborder max-w-5xl w-full max-h-[85vh] flex flex-col shadow-2xl">
+            <div class="p-5 border-b border-slate-200 dark:border-darkborder flex items-center justify-between">
+                <div>
+                    <h3 id="modalTitle" class="font-bold text-base text-slate-900 dark:text-white">Detalhamento de Transações</h3>
+                    <p id="modalSubtitle" class="text-xs text-slate-500 dark:text-slate-400">Lista discriminada do P&L</p>
+                </div>
+                <button onclick="closeDrillModal()" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div id="modalSummaryCards" class="hidden flex flex-wrap gap-3 p-4 bg-slate-50/50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-darkborder">
+            </div>
+
+            <div class="p-5 overflow-y-auto custom-scrollbar flex-1 space-y-4">
+                <div id="modalContent" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-darkborder">
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-slate-200 dark:border-darkborder flex justify-between items-center">
+                <span id="modalFooterTotal" class="text-xs font-bold text-slate-700 dark:text-slate-300"></span>
+                <button onclick="closeDrillModal()" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-xs font-semibold rounded-lg">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Unificado de Novo Lançamento (Viagem, Combustível, Despesa) -->
+    <div id="entryModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-darkcard rounded-2xl border border-slate-200 dark:border-darkborder max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl">
+            <div class="p-5 border-b border-slate-200 dark:border-darkborder flex items-center justify-between">
+                <div>
+                    <h3 id="entryModalTitle" class="font-bold text-base text-slate-900 dark:text-white"><i class="fa-solid fa-plus text-brand-500 mr-2"></i> Novo Lançamento</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Salvo instantaneamente e gravado no navegador</p>
+                </div>
+                <button onclick="closeNewEntryModal()" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="entryForm" onsubmit="saveManualEntry(event)" class="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+                <input type="hidden" id="entType" value="viagem">
+                <input type="hidden" id="entEditIndex" value="-1">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Data:</label>
+                        <input type="date" id="entData" required class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                    </div>
+                    <div id="fieldCiotContainer">
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">ID Viagem / CIOT:</label>
+                        <input type="text" id="entCiot" placeholder="Ex: 123456" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Motorista:</label>
+                        <select id="entMotorista" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                            <option value="Gabriel Fernandes Siqueira">Gabriel Fernandes Siqueira</option>
+                            <option value="Luis Fernando Lande">Luis Fernando Lande</option>
+                            <option value="Marcos Antonio da Silva Dadona">Marcos Antonio da Silva Dadona</option>
+                            <option value="Edson Leandro da Silva">Edson Leandro da Silva</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Caminhão / Placa:</label>
+                        <select id="entPlaca" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                            <option value="BDE-4B86">BDE-4B86</option>
+                            <option value="SUC-9A81">SUC-9A81</option>
+                            <option value="FYH-8F72">FYH-8F72</option>
+                            <option value="SWM-1H69">SWM-1H69</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Campos específicos de Viagem -->
+                <div id="groupViagem" class="space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Cliente:</label>
+                            <select id="entCliente" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                                <option value="">Selecione o cliente</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Destino:</label>
+                            <input type="text" id="entDestino" placeholder="Ex: Ribas do Rio Pardo/MS" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Faturamento (R$):</label>
+                            <input type="text" id="entTotal" placeholder="R$ 0,00" oninput="formatMoneyInput(this)" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Frete Líquido (R$):</label>
+                            <input type="text" id="entFreteLiq" placeholder="R$ 0,00" oninput="formatMoneyInput(this)" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Pedágio (R$):</label>
+                            <input type="text" id="entPedagio" placeholder="R$ 0,00" value="R$ 0,00" oninput="formatMoneyInput(this)" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">KM Rodado:</label>
+                            <input type="number" step="0.1" id="entKm" placeholder="0" value="0" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Quebra (R$):</label>
+                            <input type="text" id="entQuebra" placeholder="R$ 0,00" value="R$ 0,00" oninput="formatMoneyInput(this)" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Seguro (R$):</label>
+                            <input type="text" id="entSeguro" placeholder="R$ 0,00" value="R$ 0,00" oninput="formatMoneyInput(this)" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Campos específicos de Combustível -->
+                <div id="groupCombustivel" class="space-y-4 hidden">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Posto:</label>
+                            <input type="text" id="entPosto" placeholder="Ex: Posto San Remo" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Tipo de Combustível:</label>
+                            <select id="entCombustivelTipo" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                                <option value="Diesel S10">Diesel S10</option>
+                                <option value="Arla 32">Arla 32</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Litros:</label>
+                            <input type="number" step="0.01" id="entLitros" placeholder="0.00" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Valor Total (R$):</label>
+                            <input type="text" id="entCombValorTotal" placeholder="R$ 0,00" oninput="formatMoneyInput(this)" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Campos específicos de Despesa / Financeiro -->
+                <div id="groupDespesa" class="space-y-4 hidden">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Categoria:</label>
+                            <select id="entCategoria" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                                <option value="Manutenção">Manutenção</option>
+                                <option value="Peças e Pneus">Peças e Pneus</option>
+                                <option value="Documentação e Multas">Documentação e Multas</option>
+                                <option value="Despesas Administrativas">Despesas Administrativas</option>
+                                <option value="Outras Despesas">Outras Despesas</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Subcategoria:</label>
+                            <input type="text" id="entSubcategoria" placeholder="Ex: Troca de Óleo / Pneu Dianteiro" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Valor da Despesa (R$):</label>
+                        <input type="text" id="entDespValor" placeholder="R$ 0,00" oninput="formatMoneyInput(this)" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-darkborder text-slate-800 dark:text-slate-100 text-xs rounded-xl px-3 py-2 font-semibold">
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-200 dark:border-darkborder flex justify-end gap-2">
+                    <button type="button" onclick="closeNewEntryModal()" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-xs font-semibold rounded-xl">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl shadow">Salvar Lançamento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- JavaScript Engine -->
+    <script>
+        let workbook = null;
+        let parsedSheets = {};
+        
+        // Armazenamento em memória persistido no localStorage
+        let manualViagens = [];
+        let manualCombustivel = [];
+        let manualFinanceiro = [];
+
+        let selectedMotorista = 'ALL';
+        let selectedCliente = 'ALL';
+        let selectedPlaca = 'ALL';
+        let selectedMes = 'ALL';
+        let selectedAno = 'ALL';
+        let dataInicio = '';
+        let dataFim = '';
+
+        let currentSheetName = '';
+        let currentSheetData = [];
+        let filteredTableData = [];
+        let currentPage = 1;
+        let pageSize = 10;
+
+        let chartPnLInstance = null;
+        let chartPlacasInstance = null;
+
+        const placasProprias = ['BDE-4B86', 'SUC-9A81'];
+        const placasSociedade = ['FYH-8F72', 'SWM-1H69'];
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadManualEntriesFromStorage();
+            initDefaultSheets();
+            updateDashboard();
+        });
+
+        function loadManualEntriesFromStorage() {
+            try {
+                const savedV = localStorage.getItem('fleet_manual_viagens');
+                if (savedV) {
+                    manualViagens = JSON.parse(savedV).map(item => ({
+                        ...item,
+                        'Data': new Date(item['Data'])
+                    }));
+                }
+
+                const savedC = localStorage.getItem('fleet_manual_combustivel');
+                if (savedC) {
+                    manualCombustivel = JSON.parse(savedC).map(item => ({
+                        ...item,
+                        'Data': new Date(item['Data'])
+                    }));
+                }
+
+                const savedF = localStorage.getItem('fleet_manual_financeiro');
+                if (savedF) {
+                    manualFinanceiro = JSON.parse(savedF).map(item => ({
+                        ...item,
+                        'Data': new Date(item['Data'])
+                    }));
+                }
+            } catch (e) {
+                console.error("Erro ao carregar dados locais:", e);
+            }
+        }
+
+        function saveManualEntriesToStorage() {
+            try {
+                localStorage.setItem('fleet_manual_viagens', JSON.stringify(manualViagens));
+                localStorage.setItem('fleet_manual_combustivel', JSON.stringify(manualCombustivel));
+                localStorage.setItem('fleet_manual_financeiro', JSON.stringify(manualFinanceiro));
+            } catch (e) {
+                console.error("Erro ao salvar dados locais:", e);
+            }
+        }
+
+        function clearLocalData() {
+            if (confirm("Deseja realmente apagar todos os lançamentos salvos localmente no navegador?")) {
+                localStorage.removeItem('fleet_manual_viagens');
+                localStorage.removeItem('fleet_manual_combustivel');
+                localStorage.removeItem('fleet_manual_financeiro');
+                manualViagens = [];
+                manualCombustivel = [];
+                manualFinanceiro = [];
+                initDefaultSheets();
+                updateDashboard();
+                alert("Dados locais limpos com sucesso!");
+            }
+        }
+
+        function initDefaultSheets() {
+            parsedSheets = {
+                "Viagens": [...manualViagens],
+                "Combustivel": [...manualCombustivel],
+                "Financeiro": [...manualFinanceiro],
+                "Recebimentos": []
+            };
+
+            const sheetSelect = document.getElementById('sheetSelect');
+            sheetSelect.innerHTML = '';
+            Object.keys(parsedSheets).forEach(sheetName => {
+                const opt = document.createElement('option');
+                opt.value = sheetName;
+                opt.textContent = sheetName;
+                sheetSelect.appendChild(opt);
+            });
+
+            currentSheetName = "Viagens";
+            sheetSelect.value = currentSheetName;
+            populateAnoFilter();
+            populateClienteFilter();
+            populateModalClientOptions();
+        }
+
+        function formatMoneyInput(input) {
+            let value = input.value.replace(/\D/g, '');
+            if (!value) {
+                input.value = '';
+                return;
+            }
+            let number = parseFloat(value) / 100;
+            input.value = number.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function parseMoneyInput(val) {
+            if (!val) return 0;
+            if (typeof val === 'number') return val;
+            let clean = String(val).replace(/[^\d]/g, '');
+            if (!clean) return 0;
+            return parseFloat(clean) / 100;
+        }
+
+        // Theme Toggle
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            renderCharts();
+        });
+
+        // Drag & Drop
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-brand-500'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-brand-500'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-brand-500');
+            if (e.dataTransfer.files.length) handleFileSelect(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) handleFileSelect(e.target.files[0]);
+        });
+
+        function handleFileSelect(file) {
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    workbook = XLSX.read(data, { type: 'array', cellDates: true });
+
+                    parsedSheets = {};
+                    const sheetSelect = document.getElementById('sheetSelect');
+                    sheetSelect.innerHTML = '';
+
+                    workbook.SheetNames.forEach(sheetName => {
+                        const ws = workbook.Sheets[sheetName];
+                        const rawJson = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+                        
+                        if (rawJson.length) {
+                            let headerIdx = 0;
+                            let maxCols = 0;
+                            for (let i = 0; i < Math.min(10, rawJson.length); i++) {
+                                const row = rawJson[i];
+                                const validCount = row.filter(c => String(c).trim() !== '').length;
+                                if (validCount > maxCols) { maxCols = validCount; headerIdx = i; }
+                            }
+
+                            const headers = rawJson[headerIdx].map(h => String(h).trim());
+                            const rows = rawJson.slice(headerIdx + 1);
+
+                            const sheetRows = rows.map(r => {
+                                let obj = {};
+                                headers.forEach((h, idx) => {
+                                    if (h) obj[h] = r[idx] !== undefined ? r[idx] : '';
+                                });
+                                return obj;
+                            }).filter(obj => Object.values(obj).some(v => String(v).trim() !== ''));
+
+                            parsedSheets[sheetName] = sheetRows;
+                        }
+                    });
+
+                    // Integração com dados locais salvos
+                    let viagensKey = Object.keys(parsedSheets).find(s => s.toLowerCase().trim() === 'viagens');
+                    if (viagensKey) {
+                        parsedSheets[viagensKey] = [...manualViagens, ...parsedSheets[viagensKey]];
+                    } else {
+                        parsedSheets["Viagens"] = [...manualViagens];
+                    }
+
+                    let combKey = Object.keys(parsedSheets).find(s => s.toLowerCase().includes('combustível') || s.toLowerCase().includes('combustivel'));
+                    if (combKey) {
+                        parsedSheets[combKey] = [...manualCombustivel, ...parsedSheets[combKey]];
+                    } else {
+                        parsedSheets["Combustivel"] = [...manualCombustivel];
+                    }
+
+                    let finKey = Object.keys(parsedSheets).find(s => s.toLowerCase().includes('financeiro'));
+                    if (finKey) {
+                        parsedSheets[finKey] = [...manualFinanceiro, ...parsedSheets[finKey]];
+                    } else {
+                        parsedSheets["Financeiro"] = [...manualFinanceiro];
+                    }
+
+                    Object.keys(parsedSheets).forEach(sheetName => {
+                        const opt = document.createElement('option');
+                        opt.value = sheetName;
+                        opt.textContent = sheetName;
+                        sheetSelect.appendChild(opt);
+                    });
+
+                    populateAnoFilter();
+                    populateClienteFilter();
+                    populateModalClientOptions();
+
+                    currentSheetName = viagensKey || Object.keys(parsedSheets)[0];
+                    sheetSelect.value = currentSheetName;
+
+                    updateDashboard();
+                    alert("Planilha externa carregada e integrada aos lançamentos salvos!");
+
+                } catch (err) {
+                    console.error("Erro ao carregar o arquivo:", err);
+                    alert("Ocorreu um erro ao ler o arquivo Excel: " + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function populateModalClientOptions() {
+            const clienteSet = new Set();
+            Object.values(parsedSheets).forEach(rows => {
+                rows.forEach(r => {
+                    for (let col in r) {
+                        let colLower = col.toLowerCase();
+                        if (colLower.includes('cliente') || colLower.includes('nome cliente')) {
+                            let val = String(r[col]).trim();
+                            if (val && !val.toLowerCase().includes('carteira') && !val.toLowerCase().includes('nome cliente')) {
+                                clienteSet.add(val);
+                            }
+                        }
+                    }
+                });
+            });
+
+            const entClienteSelect = document.getElementById('entCliente');
+            entClienteSelect.innerHTML = '<option value="">Selecione ou cadastre o cliente</option>';
+            Array.from(clienteSet).sort().forEach(cli => {
+                const opt = document.createElement('option');
+                opt.value = cli;
+                opt.textContent = cli;
+                entClienteSelect.appendChild(opt);
+            });
+        }
+
+        // Abrir Modal de Novo Lançamento (Viagem, Combustível ou Despesa)
+        function openNewEntryModal(type, editData = null, editIdx = -1) {
+            populateModalClientOptions();
+            document.getElementById('entType').value = type;
+            document.getElementById('entEditIndex').value = editIdx;
+
+            const titleEl = document.getElementById('entryModalTitle');
+            const gViagem = document.getElementById('groupViagem');
+            const gComb = document.getElementById('groupCombustivel');
+            const gDesp = document.getElementById('groupDespesa');
+            const fieldCiot = document.getElementById('fieldCiotContainer');
+
+            gViagem.classList.add('hidden');
+            gComb.classList.add('hidden');
+            gDesp.classList.add('hidden');
+            fieldCiot.classList.remove('hidden');
+
+            let isEdit = editIdx !== -1;
+
+            if (type === 'viagem') {
+                titleEl.innerHTML = `<i class="fa-solid fa-truck-arrow-right text-brand-500 mr-2"></i> ${isEdit ? 'Editar' : 'Novo'} Lançamento de Viagem`;
+                gViagem.classList.remove('hidden');
+            } else if (type === 'combustivel') {
+                titleEl.innerHTML = `<i class="fa-solid fa-gas-pump text-rose-500 mr-2"></i> ${isEdit ? 'Editar' : 'Novo'} Abastecimento (Combustível)`;
+                gComb.classList.remove('hidden');
+                fieldCiot.classList.add('hidden');
+            } else if (type === 'despesa') {
+                titleEl.innerHTML = `<i class="fa-solid fa-file-invoice-dollar text-amber-500 mr-2"></i> ${isEdit ? 'Editar' : 'Novo'} Lançamento de Despesa`;
+                gDesp.classList.remove('hidden');
+                fieldCiot.classList.add('hidden');
+            }
+
+            if (isEdit && editData) {
+                document.getElementById('entData').value = editData['Data'] instanceof Date ? editData['Data'].toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+                document.getElementById('entMotorista').value = editData['Motorista'] || editData['Subcategoria'] || 'Gabriel Fernandes Siqueira';
+                document.getElementById('entPlaca').value = editData['Caminhão'] || editData['Veículo'] || editData['Placa'] || 'BDE-4B86';
+                
+                if (type === 'viagem') {
+                    document.getElementById('entCiot').value = editData['ID Viagem'] || '';
+                    document.getElementById('entCliente').value = editData['Cliente'] || '';
+                    document.getElementById('entDestino').value = editData['Destino'] || '';
+                    document.getElementById('entTotal').value = (editData['Total'] || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                    document.getElementById('entFreteLiq').value = (editData['Frete (R$)'] || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                    document.getElementById('entPedagio').value = (editData['Pedágio'] || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                    document.getElementById('entKm').value = editData['KM Rodado'] || 0;
+                    document.getElementById('entQuebra').value = (editData['Quebra'] || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                    document.getElementById('entSeguro').value = (editData['Seguro'] || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                } else if (type === 'combustivel') {
+                    document.getElementById('entPosto').value = editData['Posto'] || '';
+                    document.getElementById('entCombustivelTipo').value = editData['Combustivel'] || 'Diesel S10';
+                    document.getElementById('entLitros').value = editData['Litros'] || 0;
+                    document.getElementById('entCombValorTotal').value = (editData['Valor Total'] || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                } else if (type === 'despesa') {
+                    document.getElementById('entCategoria').value = editData['Categoria'] || 'Manutenção';
+                    document.getElementById('entSubcategoria').value = editData['Subcategoria'] || '';
+                    document.getElementById('entDespValor').value = (editData['Valor (R$)'] || editData['Valor'] || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                }
+            } else {
+                document.getElementById('entData').value = new Date().toISOString().split('T')[0];
+                document.getElementById('entCiot').value = '';
+                document.getElementById('entDestino').value = '';
+                document.getElementById('entTotal').value = '';
+                document.getElementById('entFreteLiq').value = '';
+                document.getElementById('entPedagio').value = 'R$ 0,00';
+                document.getElementById('entKm').value = '0';
+                document.getElementById('entQuebra').value = 'R$ 0,00';
+                document.getElementById('entSeguro').value = 'R$ 0,00';
+                document.getElementById('entPosto').value = '';
+                document.getElementById('entLitros').value = '';
+                document.getElementById('entCombValorTotal').value = '';
+                document.getElementById('entSubcategoria').value = '';
+                document.getElementById('entDespValor').value = '';
+            }
+
+            document.getElementById('entryModal').classList.remove('hidden');
+        }
+
+        function closeNewEntryModal() {
+            document.getElementById('entryModal').classList.add('hidden');
+        }
+
+        function saveManualEntry(e) {
+            e.preventDefault();
+            const type = document.getElementById('entType').value;
+            const editIdx = parseInt(document.getElementById('entEditIndex').value);
+            const dateVal = new Date(document.getElementById('entData').value + 'T00:00:00');
+            const motoristaVal = document.getElementById('entMotorista').value;
+            const placaVal = document.getElementById('entPlaca').value;
+
+            if (type === 'viagem') {
+                const novaViagem = {
+                    'Data': dateVal,
+                    'ID Viagem': document.getElementById('entCiot').value.trim(),
+                    'Motorista': motoristaVal,
+                    'Caminhão': placaVal,
+                    'Cliente': document.getElementById('entCliente').value.trim(),
+                    'Destino': document.getElementById('entDestino').value.trim(),
+                    'Total': parseMoneyInput(document.getElementById('entTotal').value),
+                    'Frete (R$)': parseMoneyInput(document.getElementById('entFreteLiq').value),
+                    'Pedágio': parseMoneyInput(document.getElementById('entPedagio').value),
+                    'KM Rodado': parseFloat(document.getElementById('entKm').value) || 0,
+                    'Quebra': parseMoneyInput(document.getElementById('entQuebra').value),
+                    'Seguro': parseMoneyInput(document.getElementById('entSeguro').value),
+                    'Outras Despesas': 0,
+                    '_isManual': true
+                };
+
+                if (editIdx >= 0) {
+                    manualViagens[editIdx] = novaViagem;
+                } else {
+                    manualViagens.push(novaViagem);
+                }
+            } else if (type === 'combustivel') {
+                const novoComb = {
+                    'Data': dateVal,
+                    'Posto': document.getElementById('entPosto').value.trim(),
+                    'Motorista': motoristaVal,
+                    'Caminhão': placaVal,
+                    'Combustivel': document.getElementById('entCombustivelTipo').value,
+                    'Litros': parseFloat(document.getElementById('entLitros').value) || 0,
+                    'Valor Total': parseMoneyInput(document.getElementById('entCombValorTotal').value),
+                    '_isManual': true
+                };
+
+                if (editIdx >= 0) {
+                    manualCombustivel[editIdx] = novoComb;
+                } else {
+                    manualCombustivel.push(novoComb);
+                }
+            } else if (type === 'despesa') {
+                const novaDesp = {
+                    'Data': dateVal,
+                    'Motorista': motoristaVal,
+                    'Caminhão': placaVal,
+                    'Categoria': document.getElementById('entCategoria').value,
+                    'Subcategoria': document.getElementById('entSubcategoria').value.trim(),
+                    'Valor (R$)': parseMoneyInput(document.getElementById('entDespValor').value),
+                    '_isManual': true
+                };
+
+                if (editIdx >= 0) {
+                    manualFinanceiro[editIdx] = novaDesp;
+                } else {
+                    manualFinanceiro.push(novaDesp);
+                }
+            }
+
+            saveManualEntriesToStorage();
+            initDefaultSheets();
+            closeNewEntryModal();
+            updateDashboard();
+            alert("Lançamento salvo com sucesso no navegador!");
+        }
+
+        function deleteManualRecord(sheetType, originalIndex) {
+            if (!confirm("Deseja realmente excluir este lançamento manual?")) return;
+
+            if (sheetType.toLowerCase().includes('viagem')) {
+                // Encontra e remove pelo índice correspondente nos manuais
+                manualViagens.splice(originalIndex, 1);
+            } else if (sheetType.toLowerCase().includes('combustivel')) {
+                manualCombustivel.splice(originalIndex, 1);
+            } else if (sheetType.toLowerCase().includes('financeiro')) {
+                manualFinanceiro.splice(originalIndex, 1);
+            }
+
+            saveManualEntriesToStorage();
+            initDefaultSheets();
+            updateDashboard();
+            closeDrillModal();
+            alert("Registro excluído com sucesso!");
+        }
+
+        function normalizePlaca(val) {
+            if (!val) return '';
+            let str = String(val).trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (str.includes('BDE4B86')) return 'BDE-4B86';
+            if (str.includes('SUC9A81')) return 'SUC-9A81';
+            if (str.includes('FYH8F72')) return 'FYH-8F72';
+            if (str.includes('SWM1H69')) return 'SWM-1H69';
+            return str;
+        }
+
+        function parseCurrency(val) {
+            if (val === null || val === undefined || val === '') return 0;
+            if (typeof val === 'number') return isNaN(val) ? 0 : val;
+
+            let str = String(val).trim();
+            if (str.includes(',')) {
+                str = str.replace(/[^\d,-]/g, '').replace(/\./g, '').replace(',', '.');
+            } else {
+                str = str.replace(/[^\d.-]/g, '');
+            }
+            const num = parseFloat(str);
+            return isNaN(num) ? 0 : num;
+        }
+
+        function populateAnoFilter() {
+            const anoSet = new Set();
+            Object.values(parsedSheets).forEach(rows => {
+                rows.forEach(r => {
+                    Object.keys(r).forEach(col => {
+                        if (col.toLowerCase().includes('data') || col.toLowerCase().includes('mês')) {
+                            const d = r[col];
+                            if (d instanceof Date) anoSet.add(d.getFullYear());
+                            else if (typeof d === 'string') {
+                                const yr = d.match(/20\d\d/);
+                                if (yr) anoSet.add(parseInt(yr[0]));
+                            }
+                        }
+                    });
+                });
+            });
+
+            const anoFilter = document.getElementById('anoFilter');
+            anoFilter.innerHTML = '<option value="ALL">Todos os Anos</option>';
+            Array.from(anoSet).sort().forEach(y => {
+                const opt = document.createElement('option');
+                opt.value = y;
+                opt.textContent = y;
+                anoFilter.appendChild(opt);
+            });
+        }
+
+        function populateClienteFilter() {
+            const clienteSet = new Set();
+            Object.values(parsedSheets).forEach(rows => {
+                rows.forEach(r => {
+                    for (let col in r) {
+                        let colLower = col.toLowerCase();
+                        if (colLower.includes('cliente') || colLower.includes('nome cliente')) {
+                            let val = String(r[col]).trim();
+                            if (val && !val.toLowerCase().includes('carteira') && !val.toLowerCase().includes('nome cliente')) {
+                                clienteSet.add(val);
+                            }
+                        }
+                    }
+                });
+            });
+
+            const clienteFilter = document.getElementById('clienteFilter');
+            clienteFilter.innerHTML = '<option value="ALL">Todos os Clientes</option>';
+            Array.from(clienteSet).sort().forEach(cli => {
+                const opt = document.createElement('option');
+                opt.value = cli;
+                opt.textContent = cli;
+                clienteFilter.appendChild(opt);
+            });
+        }
+
+        // Event Listeners dos Filtros
+        document.getElementById('motoristaFilter').addEventListener('change', (e) => { selectedMotorista = e.target.value; updateDashboard(); });
+        document.getElementById('clienteFilter').addEventListener('change', (e) => { selectedCliente = e.target.value; updateDashboard(); });
+        document.getElementById('placaFilter').addEventListener('change', (e) => { selectedPlaca = e.target.value; updateDashboard(); });
+        document.getElementById('mesFilter').addEventListener('change', (e) => { selectedMes = e.target.value; updateDashboard(); });
+        document.getElementById('anoFilter').addEventListener('change', (e) => { selectedAno = e.target.value; updateDashboard(); });
+        document.getElementById('dataInicioFilter').addEventListener('change', (e) => { dataInicio = e.target.value; updateDashboard(); });
+        document.getElementById('dataFimFilter').addEventListener('change', (e) => { dataFim = e.target.value; updateDashboard(); });
+        document.getElementById('sheetSelect').addEventListener('change', (e) => { currentSheetName = e.target.value; updateTableData(); });
+
+        function updateDashboard() {
+            calculatePnL();
+            calculateOperational();
+            updateTableData();
+            renderCharts();
+        }
+
+        function isMatchingMotorista(row) {
+            if (selectedMotorista === 'ALL') return true;
+
+            let targetFullName = selectedMotorista.toUpperCase();
+            let targetFirstName = targetFullName.split(' ')[0];
+
+            for (let col in row) {
+                let colName = col.toLowerCase();
+                let val = String(row[col]).toUpperCase();
+
+                if (colName.includes('motorista') || colName.includes('subcategoria') || colName.includes('observação') || colName.includes('obs')) {
+                    if (val.includes(targetFullName) || val.includes(targetFirstName)) return true;
+                }
+            }
+            return false;
+        }
+
+        function isMatchingCliente(row) {
+            if (selectedCliente === 'ALL') return true;
+            let target = selectedCliente.toUpperCase().trim();
+
+            for (let col in row) {
+                let colName = col.toLowerCase();
+                let val = String(row[col]).toUpperCase().trim();
+
+                if (colName.includes('cliente')) {
+                    if (val === target || val.includes(target)) return true;
+                }
+            }
+            let hasClienteCol = Object.keys(row).some(k => k.toLowerCase().includes('cliente'));
+            return !hasClienteCol;
+        }
+
+        function isMatchingDate(row) {
+            let matchMonthYear = true;
+            let matchRange = true;
+
+            for (let col in row) {
+                if (col.toLowerCase().includes('data') || col.toLowerCase().includes('mês')) {
+                    let val = row[col];
+                    let dateObj = null;
+
+                    if (val instanceof Date) dateObj = val;
+                    else if (typeof val === 'string' && val.includes('-')) dateObj = new Date(val);
+
+                    if (dateObj && !isNaN(dateObj.getTime())) {
+                        let m = dateObj.getMonth() + 1;
+                        let y = dateObj.getFullYear();
+                        let rowDateStr = dateObj.toISOString().split('T')[0];
+
+                        let matchM = selectedMes === 'ALL' || parseInt(selectedMes) === m;
+                        let matchY = selectedAno === 'ALL' || parseInt(selectedAno) === y;
+                        matchMonthYear = (matchM && matchY);
+
+                        if (dataInicio && rowDateStr < dataInicio) matchRange = false;
+                        if (dataFim && rowDateStr > dataFim) matchRange = false;
+
+                        return matchMonthYear && matchRange;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function isMatchingPlaca(row) {
+            if (selectedPlaca === 'ALL') return true;
+
+            let rowPlaca = '';
+            for (let col in row) {
+                let colLower = col.toLowerCase();
+                if (colLower.includes('caminhão') || colLower.includes('veículo') || colLower.includes('placa')) {
+                    rowPlaca = normalizePlaca(row[col]);
+                }
+            }
+
+            if (selectedPlaca === 'SOCIEDADE') {
+                if (rowPlaca) return placasSociedade.includes(rowPlaca);
+                let obs = JSON.stringify(row).toUpperCase();
+                return obs.includes('FYH') || obs.includes('SWM');
+            }
+
+            if (selectedPlaca === 'PROPRIOS') {
+                if (rowPlaca) return placasProprias.includes(rowPlaca);
+                let obs = JSON.stringify(row).toUpperCase();
+                return obs.includes('BDE') || obs.includes('SUC') || obs.includes('LUIS') || obs.includes('GABRIEL');
+            }
+
+            if (rowPlaca) return rowPlaca === selectedPlaca;
+
+            let obsStr = JSON.stringify(row).toUpperCase();
+            if (selectedPlaca === 'BDE-4B86' && (obsStr.includes('LUIS') || obsStr.includes('BDE4B86'))) return true;
+            if (selectedPlaca === 'SUC-9A81' && (obsStr.includes('GABRIEL') || obsStr.includes('SUC9A81'))) return true;
+            if (selectedPlaca === 'FYH-8F72' && obsStr.includes('FYH8F72')) return true;
+            if (selectedPlaca === 'SWM-1H69' && obsStr.includes('SWM1H69')) return true;
+
+            return false;
+        }
+
+        function getValByColOrKey(row, colNames) {
+            for (let key in row) {
+                let keyClean = key.toLowerCase().trim();
+                for (let name of colNames) {
+                    if (keyClean === name.toLowerCase() || keyClean.includes(name.toLowerCase())) {
+                        let val = row[key];
+                        if (val !== undefined && val !== null && val !== '') return val;
+                    }
+                }
+            }
+            return 0;
+        }
+
+        // Motor de Cálculo Financeiro P&L
+        function calculatePnL() {
+            let totalFreteBruto = 0;
+            let totalPedagio = 0;
+            let totalCombustivel = 0;
+            let totalDespesas = 0;
+            let totalAReceber = 0;
+            let totalViagensCount = 0;
+
+            const viagensSheet = Object.keys(parsedSheets).find(s => s.toLowerCase().trim() === 'viagens');
+            const recebimentosSheet = Object.keys(parsedSheets).find(s => s.toLowerCase().includes('recebimento'));
+
+            let recebidoPorCIOT = {};
+            if (recebimentosSheet) {
+                parsedSheets[recebimentosSheet].forEach(r => {
+                    let ciot = String(r['ID Viagem'] || getValByColOrKey(r, ['id viagem', 'ciot']) || '').trim();
+                    let valRec = parseCurrency(r['Valor Recebido'] || getValByColOrKey(r, ['valor recebido', 'valor']));
+                    if (ciot) {
+                        recebidoPorCIOT[ciot] = (recebidoPorCIOT[ciot] || 0) + valRec;
+                    }
+                });
+            }
+
+            if (viagensSheet) {
+                parsedSheets[viagensSheet].forEach(r => {
+                    if (isMatchingMotorista(r) && isMatchingCliente(r) && isMatchingPlaca(r) && isMatchingDate(r)) {
+                        totalViagensCount++;
+                        let ciot = String(r['ID Viagem'] || getValByColOrKey(r, ['id viagem', 'ciot']) || '').trim();
+                        let valFreteBruto = parseCurrency(r['Total'] || getValByColOrKey(r, ['total']));
+                        let freteLiquido = parseCurrency(r['Frete (R$)'] || getValByColOrKey(r, ['frete (r$)']));
+                        let quebra = parseCurrency(r['Quebra'] || getValByColOrKey(r, ['quebra']));
+                        let seguro = parseCurrency(r['Seguro'] || getValByColOrKey(r, ['seguro']));
+                        let outrasDesp = parseCurrency(r['Outras Despesas'] || getValByColOrKey(r, ['outras despesas']));
+                        let valRecTotal = recebidoPorCIOT[ciot] || 0;
+                        
+                        let saldo = freteLiquido - valRecTotal - quebra - seguro - outrasDesp;
+
+                        totalFreteBruto += valFreteBruto;
+                        if (saldo > 0.01) {
+                            totalAReceber += saldo;
+                        }
+
+                        let pedVal = parseCurrency(r['Pedágio'] || getValByColOrKey(r, ['pedágio', 'pedagio']));
+                        totalPedagio += pedVal;
+                    }
+                });
+            }
+
+            const combSheet = Object.keys(parsedSheets).find(s => s.toLowerCase().includes('combustível') || s.toLowerCase().includes('combustivel'));
+            if (combSheet) {
+                parsedSheets[combSheet].forEach(r => {
+                    if (isMatchingMotorista(r) && isMatchingCliente(r) && isMatchingPlaca(r) && isMatchingDate(r)) {
+                        let val = parseCurrency(r['Valor Total'] || getValByColOrKey(r, ['valor total', 'total']));
+                        totalCombustivel += val;
+                    }
+                });
+            }
+
+            const finSheet = Object.keys(parsedSheets).find(s => s.toLowerCase().includes('financeiro'));
+            if (finSheet) {
+                parsedSheets[finSheet].forEach(r => {
+                    if (isMatchingMotorista(r) && isMatchingCliente(r) && isMatchingPlaca(r) && isMatchingDate(r)) {
+                        let val = parseCurrency(r['Valor (R$)'] || getValByColOrKey(r, ['valor (r$)', 'valor']));
+                        totalDespesas += val;
+                    }
+                });
+            }
+
+            let resultadoLiquido = totalFreteBruto - (totalCombustivel + totalPedagio + totalDespesas);
+            let margemPerc = totalFreteBruto > 0 ? (resultadoLiquido / totalFreteBruto) * 100 : 0;
+
+            document.getElementById('kpiTotalViagens').textContent = totalViagensCount;
+            document.getElementById('kpiFreteBruto').textContent = formatCurrency(totalFreteBruto);
+            document.getElementById('kpiAReceber').textContent = formatCurrency(totalAReceber);
+            document.getElementById('kpiPedagio').textContent = formatCurrency(totalPedagio);
+            document.getElementById('kpiCombustivel').textContent = formatCurrency(totalCombustivel);
+            document.getElementById('kpiDespesas').textContent = formatCurrency(totalDespesas);
+            document.getElementById('kpiResultado').textContent = formatCurrency(resultadoLiquido);
+            document.getElementById('kpiMargem').textContent = margemPerc.toFixed(1) + '%';
+        }
+
+        // Motor de Cálculo Operacional
+        function calculateOperational() {
+            let totalKm = 0;
+            let totalLitrosDieselSanRemo = 0;
+
+            const viagensSheet = Object.keys(parsedSheets).find(s => s.toLowerCase().trim() === 'viagens');
+            if (viagensSheet) {
+                parsedSheets[viagensSheet].forEach(r => {
+                    if (isMatchingMotorista(r) && isMatchingCliente(r) && isMatchingPlaca(r) && isMatchingDate(r)) {
+                        let km = parseCurrency(r['KM Rodado'] || getValByColOrKey(r, ['km rodado']));
+                        totalKm += km;
+                    }
+                });
+            }
+
+            const combSheet = Object.keys(parsedSheets).find(s => s.toLowerCase().includes('combustível') || s.toLowerCase().includes('combustivel'));
+            if (combSheet) {
+                parsedSheets[combSheet].forEach(r => {
+                    if (isMatchingMotorista(r) && isMatchingPlaca(r) && isMatchingDate(r)) {
+                        let tipoComb = String(r['Combustivel'] || getValByColOrKey(r, ['combustivel'])).toUpperCase();
+                        let posto = String(r['Posto'] || getValByColOrKey(r, ['posto'])).toUpperCase();
+                        
+                        if (tipoComb.includes('DIESEL') && posto.includes('SAN REMO')) {
+                            let litros = parseCurrency(r['Litros'] || getValByColOrKey(r, ['litros']));
+                            totalLitrosDieselSanRemo += litros;
+                        }
+                    }
+                });
+            }
+
+            let mediaKmPorLitro = totalLitrosDieselSanRemo > 0 ? (totalKm / totalLitrosDieselSanRemo) : 0;
+
+            document.getElementById('kpiTotalKm').textContent = totalKm.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' km';
+            document.getElementById('kpiTotalLitros').textContent = totalLitrosDieselSanRemo.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + ' L';
+            document.getElementById('kpiMediaKmLitro').textContent = mediaKmPorLitro.toFixed(2) + ' km/L';
+        }
+
+        function formatCurrency(val) {
+            return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function updateTableData() {
+            currentSheetData = parsedSheets[currentSheetName] || [];
+            filteredTableData = currentSheetData.filter(row => isMatchingMotorista(row) && isMatchingCliente(row) && isMatchingPlaca(row) && isMatchingDate(row));
+
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+            if (query) {
+                filteredTableData = filteredTableData.filter(row => {
+                    return Object.values(row).some(v => String(v).toLowerCase().includes(query));
+                });
+            }
+
+            currentPage = 1;
+            renderTable();
+        }
+
+        function renderTable() {
+            const tableHeader = document.getElementById('tableHeader');
+            const tableBody = document.getElementById('tableBody');
+
+            if (!filteredTableData.length) {
+                tableHeader.innerHTML = '<th class="p-3">Sem Dados</th>';
+                tableBody.innerHTML = '<tr><td class="p-6 text-center text-slate-400">Nenhum registro encontrado.</td></tr>';
+                document.getElementById('paginationInfo').textContent = 'Exibindo 0 registros';
+                return;
+            }
+
+            const columns = Object.keys(filteredTableData[0]);
+            tableHeader.innerHTML = columns.map(col => `<th class="p-3 whitespace-nowrap">${col}</th>`).join('') + '<th class="p-3 whitespace-nowrap text-right">Ações</th>';
+
+            const totalRecords = filteredTableData.length;
+            const totalPages = Math.ceil(totalRecords / pageSize);
+            const startIdx = (currentPage - 1) * pageSize;
+            const endIdx = Math.min(startIdx + pageSize, totalRecords);
+            const pageRecords = filteredTableData.slice(startIdx, endIdx);
+
+            tableBody.innerHTML = pageRecords.map((row, idx) => {
+                let actualIndex = startIdx + idx;
+                let isManual = row._isManual === true;
+
+                return `
+                    <tr class="hover:bg-brand-50/50 dark:hover:bg-slate-800/80 transition">
+                        ${columns.map(col => {
+                            let val = row[col];
+                            if (val instanceof Date) val = val.toLocaleDateString('pt-BR');
+                            else if (typeof val === 'number') val = val.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+                            return `<td class="p-3 whitespace-nowrap cursor-pointer" onclick="openRowDetailModal(${actualIndex})">${val !== undefined ? val : ''}</td>`;
+                        }).join('')}
+                        <td class="p-3 whitespace-nowrap text-right">
+                            ${isManual ? `
+                                <button onclick="editManualRow('${currentSheetName}', ${actualIndex})" class="px-2 py-1 bg-brand-500/10 text-brand-500 hover:bg-brand-500 hover:text-white rounded text-[11px] font-semibold transition mr-1" title="Editar"><i class="fa-solid fa-pen"></i></button>
+                                <button onclick="deleteManualRecord('${currentSheetName}', ${actualIndex})" class="px-2 py-1 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded text-[11px] font-semibold transition" title="Excluir"><i class="fa-solid fa-trash"></i></button>
+                            ` : `<span class="text-[10px] text-slate-400 italic">Planilha</span>`}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('paginationInfo').textContent = `Exibindo ${startIdx + 1} a ${endIdx} de ${totalRecords} registros`;
+            document.getElementById('pageNumber').textContent = `Página ${currentPage} de ${totalPages || 1}`;
+
+            document.getElementById('btnPrev').disabled = currentPage === 1;
+            document.getElementById('btnNext').disabled = currentPage >= totalPages;
+        }
+
+        function editManualRow(sheetName, idx) {
+            let rowData = filteredTableData[idx];
+            if (!rowData) return;
+
+            if (sheetName.toLowerCase().trim() === 'viagens') {
+                let manualIdx = manualViagens.findIndex(v => v === rowData || (v['ID Viagem'] === rowData['ID Viagem'] && v['Data'].getTime() === rowData['Data'].getTime()));
+                openNewEntryModal('viagem', rowData, manualIdx >= 0 ? manualIdx : 0);
+            } else if (sheetName.toLowerCase().includes('combustível') || sheetName.toLowerCase().includes('combustivel')) {
+                let manualIdx = manualCombustivel.findIndex(c => c === rowData);
+                openNewEntryModal('combustivel', rowData, manualIdx >= 0 ? manualIdx : 0);
+            } else if (sheetName.toLowerCase().includes('financeiro')) {
+                let manualIdx = manualFinanceiro.findIndex(f => f === rowData);
+                openNewEntryModal('despesa', rowData, manualIdx >= 0 ? manualIdx : 0);
+            }
+        }
+
+        document.getElementById('searchInput').addEventListener('input', updateTableData);
+        document.getElementById('pageSizeSelect').addEventListener('change', (e) => {
+            pageSize = parseInt(e.target.value);
+            currentPage = 1;
+            renderTable();
+        });
+        document.getElementById('btnPrev').addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderTable(); } });
+        document.getElementById('btnNext').addEventListener('click', () => {
+            const totalPages = Math.ceil(filteredTableData.length / pageSize);
+            if (currentPage < totalPages) { currentPage++; renderTable(); }
+        });
+
+        function openDrillDownModal(kpiType) {
+            const modal = document.getElementById('drillModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalSubtitle = document.getElementById('modalSubtitle');
+            const modalContent = document.getElementById('modalContent');
+            const modalSummaryCards = document.getElementById('modalSummaryCards');
+            const modalFooterTotal = document.getElementById('modalFooterTotal');
+
+            modalSummaryCards.classList.add('hidden');
+            modalSummaryCards.innerHTML = '';
+            modalFooterTotal.textContent = '';
+            let records = [];
+            let titleStr = '';
+            let subtitleStr = `Cliente: ${selectedCliente} | Motorista: ${selectedMotorista} | Veículo: ${selectedPlaca} | Mês: ${selectedMes} | Ano: ${selectedAno}`;
+
+            if (kpiType === 'viagens_destino') {
+                modalTitle.innerHTML = `<i class="fa-solid fa-location-dot text-amber-500 mr-2"></i> Quantidade de Viagens por Destino`;
+                modalSubtitle.textContent = `Visão consolidada de operações por localidade`;
+                
+                const viagensSheet = Object.keys(parsedSheets).find(s => s.toLowerCase().trim() === 'viagens');
+                if (viagensSheet) {
+                    let destMap = {};
+                    let totalGlobalFrete = 0;
+                    let totalGlobalViagens = 0;
+
+                    parsedSheets[viagensSheet].forEach(r => {
+                        if (isMatchingMotorista(r) && isMatchingCliente(r) && isMatchingPlaca(r) && isMatchingDate(r)) {
+                            let destino = String(r['Destino'] || getValByColOrKey(r, ['destino']) || '-').trim();
+                            if (!destino) destino = '-';
+                            let freteVal = parseCurrency(r['Total'] || r['Frete (R$)'] || getValByColOrKey(r, ['total']));
+
+                            totalGlobalViagens++;
+                            totalGlobalFrete += freteVal;
+
+                            if (!destMap[destino]) destMap[destino] = { viagens: 0, frete: 0 };
+                            destMap[destino].viagens++;
+                            destMap[destino].frete += freteVal;
+                        }
+                    });
+
+                    let sortedDest = Object.entries(destMap).sort((a, b) => b[1].viagens - a[1].viagens);
+
+                    modalContent.innerHTML = `
+                        <div class="space-y-3 p-1">
+                            ${sortedDest.map(([dest, data]) => {
+                                let perc = totalGlobalFrete > 0 ? (data.frete / totalGlobalFrete) * 100 : 0;
+                                return `
+                                    <div class="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-darkborder flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center text-lg">
+                                                <i class="fa-solid fa-location-dot"></i>
+                                            </div>
+                                            <div>
+                                                <h4 class="font-bold text-sm text-slate-800 dark:text-white">${dest}</h4>
+                                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                    Frete Acumulado: <b class="text-slate-700 dark:text-slate-200">${formatCurrency(data.frete)}</b> (${perc.toFixed(1)}% do total)
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div class="px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-500 font-extrabold text-xs whitespace-nowrap">
+                                            ${data.viagens} ${data.viagens === 1 ? 'viagem' : 'viagens'}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                    modalFooterTotal.textContent = `Total Geral: ${totalGlobalViagens} viagens`;
+                    modal.classList.remove('hidden');
+                    return;
+                }
+            } else if (kpiType === 'a_receber') {
+                titleStr = 'Detalhamento: CIOTs em Aberto';
+                const viagensSheet = Object.keys(parsedSheets).find(s => s.toLowerCase().trim() === 'viagens');
+                const recebimentosSheet = Object.keys(parsedSheets).find(s => s.toLowerCase().includes('recebimento'));
+
+                let recebidoPorCIOT = {};
+                if (recebimentosSheet) {
+                    parsedSheets[recebimentosSheet].forEach(r => {
+                        let ciot = String(r['ID Viagem'] || getValByColOrKey(r, ['id viagem', 'ciot']) || '').trim();
+                        let valRec = parseCurrency(r['Valor Recebido'] || getValByColOrKey(r, ['valor recebido', 'valor']));
+                        if (ciot) recebidoPorCIOT[ciot] = (recebidoPorCIOT[ciot] || 0) + valRec;
+                    });
+                }
+
+                if (viagensSheet) {
+                    let pendentesList = [];
+                    let totAberto = 0;
+
+                    parsedSheets[viagensSheet].forEach(r => {
+                        if (isMatchingMotorista(r) && isMatchingCliente(r) && isMatchingPlaca(r) && isMatchingDate(r)) {
+                            let ciot = String(r['ID Viagem'] || getValByColOrKey(r, ['id viagem', 'ciot']) || '').trim();
+                            let placa = r['Caminhão'] || r['Veículo'] || r['Placa'] || '-';
+                            let cliente = r['Cliente'] || '-';
+                            let freteLiquido = parseCurrency(r['Frete (R$)'] || getValByColOrKey(r, ['frete (r$)']));
+                            let quebra = parseCurrency(r['Quebra'] || getValByColOrKey(r, ['quebra']));
+                            let seguro = parseCurrency(r['Seguro'] || getValByColOrKey(r, ['seguro']));
+                            let outrasDesp = parseCurrency(r['Outras Despesas'] || getValByColOrKey(r, ['outras despesas']));
+                            let valRec = recebidoPorCIOT[ciot] || 0;
+                            let saldo = freteLiquido - valRec - quebra - seguro - outrasDesp;
+
+                            if (saldo > 0.01) {
+                                totAberto += saldo;
+                                pendentesList.push({
+                                    'CIOT / ID Viagem': ciot,
+                                    'Placa': placa,
+                                    'Cliente': cliente,
+                                    'Frete Líquido': formatCurrency(freteLiquido),
+                                    'Total Recebido': formatCurrency(valRec),
+                                    'Saldo a Receber': formatCurrency(saldo)
+                                });
+                            }
+                        }
+                    });
+
+                    modalSummaryCards.innerHTML = `
+                        <div class="flex-1 min-w-[240px] p-3 bg-white dark:bg-darkcard rounded-xl border border-amber-300 dark:border-amber-800">
+                            <span class="block text-[10px] font-bold text-amber-600 uppercase">Total Pendente a Receber</span>
+                            <h4 class="text-sm font-bold text-amber-600 dark:text-amber-400 mt-0.5">${formatCurrency(totAberto)}</h4>
+                        </div>
+                    `;
+                    modalSummaryCards.classList.remove('hidden');
+                    records = pendentesList;
+                }
+            } else if (kpiType === 'frete_bruto') {
+                titleStr = 'Detalhamento: Faturamento Bruto';
+                const sheet = Object.keys(parsedSheets).find(s => s.toLowerCase().trim() === 'viagens');
+                if (sheet) {
+                    records = parsedSheets[sheet].filter(r => isMatchingMotorista(r) && isMatchingCliente(r) && isMatchingPlaca(r) && isMatchingDate(r));
+                }
+            } else if (kpiType === 'pedagio') {
+                titleStr = 'Detalhamento de Pedágios por Viagem';
+                const sheet = Object.keys(parsedSheets).find(s => s.toLowerCase().trim() === 'viagens');
+                if (sheet) {
+                    records = parsedSheets[sheet].filter(r => isMatchingMotorista(r) && isMatchingCliente(r) && isMatchingPlaca(r) && isMatchingDate(r) && parseCurrency(r['Pedágio'] || getValByColOrKey(r, ['pedágio', 'pedagio'])) > 0);
+                }
+            } else if (kpiType === 'combustivel') {
+                titleStr = 'Detalhamento: Abastecimentos';
+                const sheet = Object.keys(parsedSheets).find(s => s.toLowerCase().includes('combustível') || s.toLowerCase().includes('combustivel'));
+                if (sheet) {
+                    records = parsedSheets[sheet].filter(r => isMatchingMotorista(r) && isMatchingPlaca(r) && isMatchingDate(r));
+                }
+            } else if (kpiType === 'despesas') {
+                titleStr = 'Detalhamento de Despesas';
+                const sheet = Object.keys(parsedSheets).find(s => s.toLowerCase().includes('financeiro'));
+                if (sheet) {
+                    records = parsedSheets[sheet].filter(r => isMatchingMotorista(r) && isMatchingPlaca(r) && isMatchingDate(r));
+                }
+            } else if (kpiType === 'resultado') {
+                titleStr = 'Resumo Consolidado do Resultado (P&L)';
+                modalTitle.textContent = titleStr;
+                modalSubtitle.textContent = subtitleStr;
+                
+                const rec = parseCurrency(document.getElementById('kpiFreteBruto').textContent);
+                const ped = parseCurrency(document.getElementById('kpiPedagio').textContent);
+                const comb = parseCurrency(document.getElementById('kpiCombustivel').textContent);
+                const desp = parseCurrency(document.getElementById('kpiDespesas').textContent);
+                const res = rec - (comb + ped + desp);
+
+                modalContent.innerHTML = `
+                    <div class="p-6 space-y-4">
+                        <div class="flex justify-between items-center p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl">
+                            <span class="font-semibold text-emerald-700 dark:text-emerald-400">(+) Faturamento Bruto Total:</span>
+                            <span class="font-bold text-emerald-700 dark:text-emerald-400">${formatCurrency(rec)}</span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-xl">
+                            <span class="font-semibold text-indigo-700 dark:text-indigo-400">(-) Total Pedágios:</span>
+                            <span class="font-bold text-indigo-700 dark:text-indigo-400">${formatCurrency(ped)}</span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-rose-50 dark:bg-rose-950/30 rounded-xl">
+                            <span class="font-semibold text-rose-700 dark:text-rose-400">(-) Total Combustível:</span>
+                            <span class="font-bold text-rose-700 dark:text-rose-400">${formatCurrency(comb)}</span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl">
+                            <span class="font-semibold text-amber-700 dark:text-amber-400">(-) Outras Despesas:</span>
+                            <span class="font-bold text-amber-700 dark:text-amber-400">${formatCurrency(desp)}</span>
+                        </div>
+                        <div class="flex justify-between items-center p-4 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-800">
+                            <span class="font-bold text-blue-800 dark:text-blue-300 text-base">(=) Resultado Líquido Final:</span>
+                            <span class="font-bold text-blue-800 dark:text-blue-300 text-base">${formatCurrency(res)}</span>
+                        </div>
+                    </div>
+                `;
+                modal.classList.remove('hidden');
+                return;
+            }
+
+            modalTitle.textContent = titleStr;
+            modalSubtitle.textContent = subtitleStr;
+
+            if (!records.length) {
+                modalContent.innerHTML = '<p class="p-6 text-center text-slate-400">Nenhum lançamento encontrado para esta categoria.</p>';
+            } else {
+                const cols = Object.keys(records[0]).filter(c => c !== '_isManual');
+                modalContent.innerHTML = `
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="bg-slate-100 dark:bg-slate-800">
+                            <tr>
+                                ${cols.map(c => `<th class="p-3 whitespace-nowrap font-bold">${c}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                            ${records.map(r => `
+                                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                    ${cols.map(c => {
+                                        let val = r[c];
+                                        if (val instanceof Date) val = val.toLocaleDateString('pt-BR');
+                                        else if (typeof val === 'number') val = val.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+                                        return `<td class="p-3 whitespace-nowrap">${val !== undefined ? val : ''}</td>`;
+                                    }).join('')}
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function openRowDetailModal(idx) {
+            const row = filteredTableData[idx];
+            if (!row) return;
+
+            const modal = document.getElementById('drillModal');
+            document.getElementById('modalSummaryCards').classList.add('hidden');
+            document.getElementById('modalTitle').textContent = `Dossiê Detalhado do Registro #${idx + 1}`;
+            document.getElementById('modalSubtitle').textContent = `Origem: Aba "${currentSheetName}"`;
+            document.getElementById('modalFooterTotal').textContent = '';
+
+            document.getElementById('modalContent').innerHTML = `
+                <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    ${Object.entries(row).filter(([k]) => k !== '_isManual').map(([k, v]) => {
+                        let val = v;
+                        if (val instanceof Date) val = val.toLocaleDateString('pt-BR');
+                        else if (typeof val === 'number') val = val.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+                        return `
+                            <div class="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-darkborder">
+                                <span class="block text-[10px] uppercase font-bold text-slate-400">${k}</span>
+                                <span class="text-xs font-semibold text-slate-800 dark:text-slate-100">${val !== undefined ? val : '-'}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+            modal.classList.remove('hidden');
+        }
+
+        function closeDrillModal() {
+            document.getElementById('drillModal').classList.add('hidden');
+        }
+
+        function renderCharts() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? '#94a3b8' : '#475569';
+            const gridColor = isDark ? '#334155' : '#e2e8f0';
+
+            const rec = parseCurrency(document.getElementById('kpiFreteBruto').textContent);
+            const ped = parseCurrency(document.getElementById('kpiPedagio').textContent);
+            const comb = parseCurrency(document.getElementById('kpiCombustivel').textContent);
+            const desp = parseCurrency(document.getElementById('kpiDespesas').textContent);
+            const res = rec - (comb + ped + desp);
+
+            if (chartPnLInstance) chartPnLInstance.destroy();
+            const ctx1 = document.getElementById('chartPnL').getContext('2d');
+            chartPnLInstance = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: ['Faturamento Bruto', 'Pedágio', 'Combustível', 'Outras Despesas', 'Resultado Líquido'],
+                    datasets: [{
+                        data: [rec, ped, comb, desp, res],
+                        backgroundColor: ['#10b981', '#6366f1', '#f43f5e', '#f59e0b', '#3b82f6'],
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: textColor }, grid: { color: gridColor } },
+                        y: { ticks: { color: textColor }, grid: { color: gridColor } }
+                    }
+                }
+            });
+
+            let placaMap = { 'BDE-4B86': 0, 'SUC-9A81': 0, 'FYH-8F72': 0, 'SWM-1H69': 0 };
+
+            const viagensSheet = Object.keys(parsedSheets).find(s => s.toLowerCase().trim() === 'viagens');
+            if (viagensSheet) {
+                parsedSheets[viagensSheet].forEach(r => {
+                    if (isMatchingMotorista(r) && isMatchingCliente(r) && isMatchingDate(r)) {
+                        let placa = normalizePlaca(r['Caminhão'] || r['Veículo'] || r['Placa']) || 'Outros';
+                        let val = parseCurrency(r['Total'] || r['Frete (R$)'] || getValByColOrKey(r, ['total']));
+                        
+                        if (placaMap[placa] !== undefined) {
+                            placaMap[placa] += val;
+                        } else if (val > 0) {
+                            placaMap[placa] = val;
+                        }
+                    }
+                });
+            }
+
+            if (chartPlacasInstance) chartPlacasInstance.destroy();
+            const ctx2 = document.getElementById('chartPlacas').getContext('2d');
+            chartPlacasInstance = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(placaMap),
+                    datasets: [{
+                        label: 'Faturamento Bruto (R$)',
+                        data: Object.values(placaMap),
+                        backgroundColor: ['#0284c7', '#0369a1', '#f59e0b', '#d97706'],
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: textColor }, grid: { color: gridColor } },
+                        y: { ticks: { color: textColor }, grid: { color: gridColor } }
+                    }
+                }
+            });
+        }
+
+        function exportToExcel() {
+            if (!filteredTableData.length) return alert('Nenhum dado para exportar!');
+            let exportData = filteredTableData.map(r => {
+                let copy = {...r};
+                delete copy._isManual;
+                return copy;
+            });
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Fretes_Export");
+            XLSX.writeFile(wb, "Relatorio_Controle_Fretes.xlsx");
+        }
+
+        function exportToPDF() {
+            const element = document.getElementById('dashboardContent');
+            const opt = {
+                margin: 0.5,
+                filename: 'Relatorio_Controle_Fretes.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' }
+            };
+            html2pdf().set(opt).from(element).save();
+        }
+    </script>
+</body>
+</html>
